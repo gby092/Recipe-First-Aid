@@ -1,0 +1,178 @@
+import 'package:flutter/material.dart';
+
+void main() => runApp(RecipeFirstAidApp());
+
+class RecipeFirstAidApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: '菜谱急救箱',
+      theme: ThemeData(primarySwatch: Colors.green),
+      home: IngredientPickerPage(),
+    );
+  }
+}
+
+// 食材选择页面
+class IngredientPickerPage extends StatefulWidget {
+  @override
+  _IngredientPickerPageState createState() => _IngredientPickerPageState();
+}
+
+class _IngredientPickerPageState extends State<IngredientPickerPage> {
+  // 预设的常见食材列表
+  final List<String> allIngredients = [
+    '鸡蛋', '西红柿', '米饭', '黄瓜', '火腿', '青椒', '土豆', '洋葱', '鸡肉', '豆腐'
+  ];
+  
+  // 用户选择的食材（最多3种）
+  List<String> selectedIngredients = [];
+
+  void toggleIngredient(String ingredient) {
+    setState(() {
+      if (selectedIngredients.contains(ingredient)) {
+        selectedIngredients.remove(ingredient);
+      } else if (selectedIngredients.length < 3) {
+        selectedIngredients.add(ingredient);
+      }
+    });
+  }
+
+  void goToRecipe() {
+    if (selectedIngredients.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('请至少选择一种食材')),
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RecipePage(selected: selectedIngredients),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('冰箱里剩下什么？')),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              '点击食材选择（最多3种）',
+              style: TextStyle(fontSize: 18),
+            ),
+          ),
+          Expanded(
+            child: GridView.count(
+              crossAxisCount: 3,
+              padding: EdgeInsets.all(16),
+              children: allIngredients.map((ing) {
+                bool isSelected = selectedIngredients.contains(ing);
+                return Card(
+                  color: isSelected ? Colors.green[100] : Colors.white,
+                  child: InkWell(
+                    onTap: () => toggleIngredient(ing),
+                    child: Center(child: Text(ing)),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: ElevatedButton(
+              onPressed: goToRecipe,
+              child: Text('看看能做什么菜', style: TextStyle(fontSize: 18)),
+              style: ElevatedButton.styleFrom(minimumSize: Size(200, 50)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// 菜谱推荐页面
+class RecipePage extends StatelessWidget {
+  final List<String> selected;
+
+  RecipePage({required this.selected});
+
+  // 本地硬编码菜谱库（简化版）
+  final List<Map<String, dynamic>> recipes = [
+    {'name': '西红柿炒鸡蛋', 'ingredients': ['鸡蛋', '西红柿'], 'steps': '1. 打散鸡蛋；2. 炒鸡蛋盛出；3. 炒西红柿，加入鸡蛋，加盐出锅。'},
+    {'name': '蛋炒饭', 'ingredients': ['鸡蛋', '米饭'], 'steps': '1. 炒鸡蛋；2. 加入米饭翻炒；3. 加盐/葱花即可。'},
+    {'name': '黄瓜火腿丁', 'ingredients': ['黄瓜', '火腿'], 'steps': '1. 黄瓜火腿切丁；2. 下锅翻炒；3. 加盐出锅。'},
+    {'name': '青椒炒蛋', 'ingredients': ['青椒', '鸡蛋'], 'steps': '1. 青椒切丝；2. 炒鸡蛋；3. 合炒加盐。'},
+    {'name': '土豆丝', 'ingredients': ['土豆'], 'steps': '1. 土豆切丝；2. 热油炒；3. 加醋和盐。'},
+    {'name': '洋葱炒鸡蛋', 'ingredients': ['洋葱', '鸡蛋'], 'steps': '1. 洋葱切丝；2. 炒鸡蛋；3. 加洋葱同炒。'},
+    {'name': '鸡肉炒饭', 'ingredients': ['鸡肉', '米饭'], 'steps': '1. 鸡肉切丁；2. 炒鸡肉；3. 加米饭同炒。'},
+    {'name': '麻婆豆腐', 'ingredients': ['豆腐'], 'steps': '1. 豆腐切块；2. 炒豆瓣酱；3. 加豆腐焖煮。'},
+  ];
+
+  List<Map<String, dynamic>> getMatchedRecipes() {
+    // 简单匹配算法：计算每个菜谱所需食材在用户选择的食材中的命中数
+    List<Map<String, dynamic>> scored = [];
+    for (var recipe in recipes) {
+      List<String> required = List<String>.from(recipe['ingredients']);
+      int matchCount = required.where((ing) => selected.contains(ing)).length;
+      if (matchCount > 0) {
+        scored.add({
+          ...recipe,
+          'matchCount': matchCount,
+          'totalRequired': required.length,
+        });
+      }
+    }
+    // 按匹配度降序排序（命中数越多越靠前）
+    scored.sort((a, b) => b['matchCount'].compareTo(a['matchCount']));
+    return scored;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final matched = getMatchedRecipes();
+    return Scaffold(
+      appBar: AppBar(title: Text('推荐菜谱')),
+      body: matched.isEmpty
+          ? Center(
+              child: Text(
+                '没有找到完全匹配的菜谱，试试其他组合',
+                style: TextStyle(fontSize: 18),
+              ),
+            )
+          : ListView.builder(
+              itemCount: matched.length,
+              itemBuilder: (ctx, idx) {
+                final recipe = matched[idx];
+                bool isFullMatch = recipe['matchCount'] == recipe['totalRequired'];
+                return Card(
+                  margin: EdgeInsets.all(8),
+                  child: ListTile(
+                    title: Text(
+                      recipe['name'],
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isFullMatch ? Colors.green[800] : Colors.black,
+                      ),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('需要: ${(recipe['ingredients'] as List).join(', ')}'),
+                        Text('匹配度: ${recipe['matchCount']}/${recipe['totalRequired']}'),
+                        Text('步骤: ${recipe['steps']}'),
+                      ],
+                    ),
+                    isThreeLine: true,
+                  ),
+                );
+              },
+            ),
+    );
+  }
+}
